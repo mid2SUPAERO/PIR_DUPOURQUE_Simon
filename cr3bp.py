@@ -3,9 +3,9 @@
     CR3BP module
     ============
     
-    Contains the CR3BP class, that allow to create a cr3bp problem for a given value
-    of the µ parameter. CR3BP object contains methods to compute the flow, and some
-    dynamical properties such as the STM.
+    Contains the CR3BP class, that allows to create a cr3bp problem for a given 
+    valueof the µ parameter. CR3BP object contains methods to compute the flow, 
+    and some dynamical properties such as the STM.
 
     @author: Simon Dupourqué 
 """
@@ -38,6 +38,15 @@ class CR3BP:
       
         return(dF)
         
+    def ode_function_STM(self,t,Z):
+        
+        Y,R = self._unwrap(Z)
+        R = np.matrix(R)
+        dY = self.ode_function(t,Y)
+        dR = np.array(self.jacobian_matrix(Y)*R)
+        
+        return(self._wrap(dY,dR))
+        
     def propagate(self,Y,t,t0=0):
         """
             Compute the flow at time t with the state vector Y as initial value
@@ -51,28 +60,32 @@ class CR3BP:
                     
         """
         return ode87(self.ode_function,0,t,Y,propagate=True)
-        
+       
     def trajectory(self,Y,t,t0=0,points=100):
         """
         Compute several points to display the trajectory 
         """
         return ode87(self.ode_function,0,t,Y,minimal_nb_of_points=points)
     
+    def propagate_STM(self,Y,t,t0=0):
+        
+        Z0 = self._wrap(Y,np.identity(6))
+        Z = ode87(self.ode_function_STM,0,t,Z0,propagate=True)
+        phi,M = self._unwrap(Z)
+        return(phi,M)    
+    
     def jacobi_integral(self,Y):
         """
         Compute the Jacobi Integral of the state vector Y
         """
+        
         return(-(Y[3]**2+Y[4]**2+Y[5]**2) - 2*self._Omega(Y[0],Y[1],Y[2],self.mu))
         
     def jacobian_matrix(self,Y):
         """
         Compute the Jacobian Matrix of the system for the state vector Y
         """
-    
-        x = Y[0]
-        y = Y[1]
-        z = Y[2]
-        
+
         A = np.matrix(np.zeros((6,6)))
         
         A[0,3] = 1
@@ -80,18 +93,18 @@ class CR3BP:
         A[2,5] = 1
         A[3,4] = 2
         A[4,3] = -2
-        A[3,0] = -self._d2Omega_dx2(x,y,z,self.mu)
-        A[3,1] = -self._d2Omega_dxdy(x,y,z,self.mu)
-        A[3,2] = -self._d2Omega_dxdz(x,y,z,self.mu)
-        A[4,0] = -self._d2Omega_dxdy(x,y,z,self.mu)
-        A[4,1] = -self._d2Omega_dy2(x,y,z,self.mu)
-        A[4,2] = -self._d2Omega_dydz(x,y,z,self.mu)
-        A[5,0] = -self._d2Omega_dxdz(x,y,z,self.mu)
-        A[5,1] = -self._d2Omega_dydz(x,y,z,self.mu)
-        A[5,2] = -self._d2Omega_dz2(x,y,z,self.mu)
+        A[3,0] = -self._d2Omega_dx2(Y)
+        A[3,1] = -self._d2Omega_dxdy(Y)
+        A[3,2] = -self._d2Omega_dxdz(Y)
+        A[4,0] = -self._d2Omega_dxdy(Y)
+        A[4,1] = -self._d2Omega_dy2(Y)
+        A[4,2] = -self._d2Omega_dydz(Y)
+        A[5,0] = -self._d2Omega_dxdz(Y)
+        A[5,1] = -self._d2Omega_dydz(Y)
+        A[5,2] = -self._d2Omega_dz2(Y)
         
         return(A)
-        
+                
     def _Omega(self,Y):
         
         x = Y[0]
@@ -221,3 +234,10 @@ class CR3BP:
                 -3*(1-mu)*y*z*((x+mu)**2+y**2+z**2)**(-5/2)
                 -3*mu*y*z*((x-(1-mu))**2+y**2+z**2)**(-5/2)
                 )
+    
+    def _wrap(self,Y,M):
+        return(np.hstack((Y,np.reshape(M,36,))))
+
+    def _unwrap(self,Z):
+        Y,M = np.split(Z,[6])
+        return(Y,np.reshape(M,(6,6)))
